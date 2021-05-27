@@ -48,7 +48,7 @@ shinyServer(function(input, output, session) {
     output$date<-
         renderUI({
             dateInput("x",
-                      label = "日付を入力してください",
+                      label = "日付を入力(選択)してください",
                       min = "2020-04-21",
                       max = date[1,1],
                       value = date[1,1])
@@ -90,7 +90,7 @@ shinyServer(function(input, output, session) {
         left_join(yoko2)%>%
         filter(!name%in%c("日本","横浜市","市外","調査中","神奈川県"))%>%
         rename("N03_004"="name")%>%
-        mutate(count=as.numeric(count))%>%
+        mutate(count=as.numeric(as.character(count)))%>%#文字列にしてから数字に直す
         #filter(date=="4/16~4/22")%>%
         mutate(N03_003="横浜市")%>%
         mutate(start=str_replace(date,"~.+",""),
@@ -100,38 +100,69 @@ shinyServer(function(input, output, session) {
         mutate(start=str_replace(start,"/","-"),
                end=str_replace(end,"/","-"),
                start=paste0(year2,"-",start),
-               end=paste0(year2,"-",end),
-               start=lubridate::ymd(start),
-               end=lubridate::ymd(end))
+               end=paste0(year2,"-",end))#,#警告が出てたので削除した。
+               # start=lubridate::ymd(start),
+               # end=lubridate::ymd(end))
 
-    day1<-
-        reactive({
-            data%>%
-                filter(year==input$year1)%>%
-                distinct(date)
-        })
-    
-    output$date2<-
-        renderUI({
-            selectInput("d2","日付を選択してください。",
-                        choices=day1()
-            )
-        })
 
+    v<-reactiveValues(tomo=0,next1=0,yest=0,back=0,ac=0)
+    observeEvent(v$yest<input$yesterday|v$tomo<input$tomorrow|v$back<input$back|v$next1<input$next1,ignoreInit = T,{
+ 
+      x=input$x
+      
+      if(v$yest<input$yesterday){
+        v$yest<-input$yesterday
+        x=max(x-1,as.Date("2020-04-21"))
+        # if(x<"2020-04-21"){x<-"2020-04-21"}
+        updateDateInput(inputId = "x",
+                        #min = "2020-04-21",
+                        #max = date[1,1],
+                        value = x)
+      }
+      
+      if(v$tomo<input$tomorrow){
+        v$tomo<-input$tomorrow
+        x<-min(x+1,date[1,1])
+        # if(x>date[1,1]){x<-date[1,1]}
+        updateDateInput(inputId = "x",
+                        #min = "2020-04-21",
+                        #max = max(date[1,1],x),
+                        value = x)
+      }
+      if(v$back<input$back){
+        v$back<-input$back
+        x=max(x-7,as.Date("2020-04-21"))
+        # if(x<"2020-04-21"){x<-"2020-04-21"}
+        updateDateInput(inputId = "x",
+                        # min = "2020-04-21",
+                        # max = date[1,1],
+                        value = x)
+      }
+      if(v$next1<input$next1){
+        v$next1<-input$next1
+        x<-min(x+7,date[1,1])
+        # if(x>date[1,1]){x<-date[1,1]}
+        updateDateInput(inputId = "x",
+                        # min = "2020-04-21",
+                        # max = date[1,1],
+                        value = x)
+      }
+    })
+   
     action1<-
-        eventReactive(input$action, {
-            x<-input$x
-            y<-input$y
-            if(is.null(x)){
-                x<-date[1,1]
-            }
-            date1<-
-                lubridate::ymd(x)-as.numeric(y)+1
+    
+      eventReactive(!is.null(input$x)&!is.null(input$y),ignoreInit = T, {
+            x<-lubridate::ymd(input$x)
+            y<-as.numeric(input$y)
             
+
+            date1<-
+                x-y+1
+
             data7.1<-
                 data7%>%
                 dplyr::filter(Fixed_Date>=date1,
-                              Fixed_Date<=lubridate::ymd(x))%>%
+                              Fixed_Date<=x)%>%
                 # dplyr::filter(Fixed_Date>="2021-04-24",
                 #               Fixed_Date<="2021-04-24")%>%
                 dplyr::group_by(Residential_City,X,Y)%>%
@@ -151,14 +182,14 @@ shinyServer(function(input, output, session) {
                           by="N03_004", all=F,duplicateGeoms = TRUE)
             xy3<-left_join(xy,data7.1, by = "N03_004")
 
-            ggplot(data7.2)+ 
+            ggplot(data7.2)+
                 geom_sf(data=data7.2%>%filter(N03_004!="横浜市"),
                         aes(fill=count,color=""))+
                 geom_sf(data = data7.2%>%filter(N03_004=="横浜市"),
                         aes(color=""))+
                 scale_fill_gradient(low = "white",high = "red",
-                                    breaks=seq(0,as.numeric(y)*50,ifelse(y==1,10,100)),
-                                    limits=c(0,as.numeric(y)*50))+
+                                    breaks=seq(0,y*50,ifelse(y==1,10,100)),
+                                    limits=c(0,y*50))+
                 scale_color_manual(values ="gainsboro",
                                    guide=F)+
                 #geom_text(data=xy,aes(x=X,y=Y,label=N03_004))+
@@ -166,31 +197,46 @@ shinyServer(function(input, output, session) {
                                        label=paste0(N03_004_2," ",count,"人")))+
                 coord_sf(datum = NA) +
                 theme_void()+
-                ggtitle(paste(date1,lubridate::ymd(x),sep = "~"))+
+                ggtitle(paste(date1,x,sep = "~"))+
                 #theme(plot.background=element_rect(fill = "lightgray", colour = "white"))
                 theme(legend.background = element_rect(fill = "gray",size=10,colour="gray"),
                       legend.title = element_blank())
+                         
+                          
 
 
         })
+    
     output$covid_map <- renderPlot({
-        action1()
-        
+      action1()
+
         })
+   
     action2<-
-        eventReactive(input$action,{
-             x<-input$x
-        if(is.null(x)){
-            x<-date[1,1]
-        }
-        data1<-data%>%
-            dplyr::filter(end<=lubridate::ymd(x),
-                          start<=lubridate::ymd(x)-6)%>%
-            group_by(N03_004)%>%
-            mutate(rank=dense_rank(desc(end)))%>%
-            filter(rank==1)%>%
-            ungroup()
-       
+        
+      eventReactive(!is.null(input$x),ignoreInit = T, {
+             
+             x<-lubridate::ymd(input$x)
+
+        # data1<-data%>%
+        #     dplyr::filter(end<=lubridate::ymd(x),
+        #                   start<=lubridate::ymd(x)-6)%>%
+        #     group_by(N03_004)%>%
+        #     mutate(rank=dense_rank(desc(end)))%>%
+        #     filter(rank==1)%>%
+        #     ungroup()
+
+
+             data1<-data%>%
+               mutate(flag=ifelse(x<=end,1,ifelse(end<x,2,0)))%>%
+               filter(as.numeric(flag)>0)%>%
+               arrange(flag)
+              if(data1[1,10]==1){
+                data1<-data1%>%filter(x<=end,x>=start)
+              }
+              if(data1[1,10]==2){
+                data1<-data1%>%mutate(max=max(end))%>%filter(end==max)
+              }
         yoko_shp<-
             sp::merge(shp2, data1,
                           #filter(year==input$year1,date%in%input$d2)
@@ -198,20 +244,21 @@ shinyServer(function(input, output, session) {
 
         xy4<-left_join(xy2,data1, by = "N03_004")
 
+        
         ggplot(yoko_shp)+
-            geom_sf(aes(fill=count,color=""))+
-            scale_fill_gradient(low = "white",high = "red",
-                                breaks=seq(0,350,100),
-                                limits=c(0,350))+
-            scale_color_manual(values ="gainsboro",
+          geom_sf(aes(fill=count,color=""))+
+          scale_fill_gradient(low = "white",high = "red",
+                              breaks=seq(0,350,100),
+                              limits=c(0,350))+
+          scale_color_manual(values ="gainsboro",
                              guide=F)+
-            geom_text(data=xy4,aes(x=X,y=Y,label=paste0(N03_004," ",count,"人")))+
-            #geom_text(data=xy2,aes(x=X,y=Y,label=N03_004))+
-            coord_sf(datum = NA) +
-            theme_void()+
-            ggtitle(paste0(unique(as.character(yoko_shp$start)),"~",unique(as.character(yoko_shp$end))))+
-            theme(legend.background = element_rect(fill = "gray",size=10,colour="gray"),
-                  legend.title = element_blank())
+          geom_text(data=xy4,aes(x=X,y=Y,label=paste0(N03_004," ",count,"人")))+
+          #geom_text(data=xy2,aes(x=X,y=Y,label=N03_004))+
+          coord_sf(datum = NA) +
+          theme_void()+
+          ggtitle(paste0(unique(as.character(yoko_shp$start)),"~",unique(as.character(yoko_shp$end))))+
+          theme(legend.background = element_rect(fill = "gray",size=10,colour="gray"),
+                legend.title = element_blank())
           
         })
                 
@@ -220,16 +267,16 @@ shinyServer(function(input, output, session) {
        action2()
     })
     action3<-
-        eventReactive(input$action,{
-            x<-input$x
-        y<-input$y
-        if(is.null(x)){
-            x<-date[1,1]
-        }
-        date1<-lubridate::ymd(x)-as.numeric(y)+1
+        
+      eventReactive(!is.null(input$x)|!is.null(input$y), {     
+        x<-lubridate::ymd(input$x)
+        y<-as.numeric(input$y)
+
+
+        date1<-x-y+1
         #集計
         data7.1<-data7%>%
-            filter(Fixed_Date>=date1,Fixed_Date<=lubridate::ymd(x))%>%
+            filter(Fixed_Date>=date1,Fixed_Date<=x)%>%
           # dplyr::filter(Fixed_Date>="2021-05-22",
           #               Fixed_Date<="2021-05-22")%>%
             group_by(Residential_City,X,Y)%>%
@@ -245,7 +292,7 @@ shinyServer(function(input, output, session) {
             dplyr::filter(is.numeric(count_j))%>%
             filter(!is.na(count_j))%>%
             mutate(N03_004=Residential_City)
-        
+
 
         data7.2<-
             sp::merge(shp, jinko3,
@@ -258,40 +305,39 @@ shinyServer(function(input, output, session) {
             geom_sf(data = data7.2%>%filter(N03_004=="横浜市"),
                     aes(color=""))+
             scale_fill_gradient(low = "white",high = "red",
-                                breaks=seq(0,as.numeric(y)*8,ifelse(y==1,2,10)),
-                                limits=c(0,as.numeric(y)*8))+
+                                breaks=seq(0,y*8,ifelse(y==1,2,10)),
+                                limits=c(0,y*8))+
             scale_color_manual(values ="gainsboro",
                              guide=F)+
             #geom_text(data=xy,aes(x=X,y=Y,label=N03_004))+
             geom_text(data=xy3,aes(x=X,y=Y,label=paste0(N03_004_2," ",round(count_j,2),"人")))+
             coord_sf(datum = NA) +
             theme_void()+
-            ggtitle(paste(date1,lubridate::ymd(x),sep = "~"))+
+            ggtitle(paste(date1,x,sep = "~"))+
             theme(legend.background = element_rect(fill = "gray",size=10,colour="gray"),
                   legend.title = element_blank())
-
-
+       
         })
     output$covid_map2 <- renderPlot({
         action3()
         
     })
     action4<-
-        eventReactive(input$action,{
+        
+      eventReactive(!is.null(input$x), {
             x<-input$x
-        if(is.null(x)){
-            x<-date[1,1]
-        }
-            data1<-data%>%
-                # dplyr::filter(end<=lubridate::ymd(x),
-                #               start<=lubridate::ymd(x)-6)%>%
-              dplyr::filter(end<="2021-05-22",
-                            start<="2021-05-26")%>%
-                group_by(N03_004)%>%
-                mutate(rank=dense_rank(desc(end)))%>%
-                filter(rank==1)%>%
-                ungroup()
 
+
+            data1<-data%>%
+              mutate(flag=ifelse(x<=end,1,ifelse(end<x,2,0)))%>%
+              filter(as.numeric(flag)>0)%>%
+              arrange(flag)
+            if(data1[1,10]==1){
+              data1<-data1%>%filter(x<=end,x>=start)
+            }
+            if(data1[1,10]==2){
+              data1<-data1%>%mutate(max=max(end))%>%filter(end==max)
+            }
         data2<-
             left_join(data1,
                       jinko4,by=c("N03_004"="City"))%>%
@@ -316,7 +362,6 @@ shinyServer(function(input, output, session) {
             theme(legend.background = element_rect(fill = "gray",size=10,colour="gray"),
                   legend.title = element_blank())
   
-        
         })
     output$yoko_map2<-renderPlot({
         action4()
