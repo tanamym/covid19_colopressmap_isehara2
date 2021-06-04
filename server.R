@@ -48,7 +48,8 @@ shinyServer(function(input, output, session) {
     output$date<-
         renderUI({
             dateInput("x",
-                      label = "日付を入力(選択)してください",
+                      label = NULL,
+                      #label = "日付を入力(選択)してください",
                       min = "2020-04-21",
                       max = date[1,1],
                       value = date[1,1])
@@ -100,12 +101,19 @@ shinyServer(function(input, output, session) {
         mutate(start=str_replace(start,"/","-"),
                end=str_replace(end,"/","-"),
                start=paste0(year2,"-",start),
-               end=paste0(year2,"-",end))#,#警告が出てたので削除した。
-               # start=lubridate::ymd(start),
-               # end=lubridate::ymd(end))
+               end=paste0(year2,"-",end),
+               start=lubridate::ymd(start),
+               end=lubridate::ymd(end))
 
 
-    v<-reactiveValues(tomo=0,next1=0,yest=0,back=0,ac=0)
+    v<-reactiveValues(tomo=0,next1=0,yest=0,back=0,ac=0,count=0 )
+    observeEvent(input$tabset,{
+      if(input$tabset=="tab2"&v$count==0){
+        updateRadioButtons(inputId="y",
+                           selected = 7)
+        v$count=1
+      }
+    })
     observeEvent(v$yest<input$yesterday|v$tomo<input$tomorrow|v$back<input$back|v$next1<input$next1,ignoreInit = T,{
  
       x=input$x
@@ -148,10 +156,10 @@ shinyServer(function(input, output, session) {
                         value = x)
       }
     })
-   
+
     action1<-
     
-      eventReactive(!is.null(input$x)&!is.null(input$y),ignoreInit = T, {
+      eventReactive(!is.null(input$x)&!is.null(input$y)&!is.null(input$label),ignoreInit = T, {
             x<-lubridate::ymd(input$x)
             y<-as.numeric(input$y)
             
@@ -175,14 +183,19 @@ shinyServer(function(input, output, session) {
                 #dplyr::filter(X>0,Y>0)%>%
                 dplyr::filter(is.numeric(count))%>%
                 ungroup()
+            data8<-
+              data7.1%>%
+              summarise(count=sum(count))
 
             data7.2<-
                 sp::merge(shp,
                           data7.1,
                           by="N03_004", all=F,duplicateGeoms = TRUE)
             xy3<-left_join(xy,data7.1, by = "N03_004")
-
-            ggplot(data7.2)+
+            print(input$label)
+            if(input$label=="RTCT"){
+              print(input$label)
+              ggplot(data7.2)+
                 geom_sf(data=data7.2%>%filter(N03_004!="横浜市"),
                         aes(fill=count,color=""))+
                 geom_sf(data = data7.2%>%filter(N03_004=="横浜市"),
@@ -194,27 +207,79 @@ shinyServer(function(input, output, session) {
                                    guide=F)+
                 #geom_text(data=xy,aes(x=X,y=Y,label=N03_004))+
                 geom_text(data=xy3,aes(x=X,y=Y,
-                                       label=paste0(N03_004_2," ",count,"人")))+
+                                       label=paste0(N03_004_2," ",round(count,2),"人")))+
+                geom_text(data=data8,
+                          aes(x=139.650599530497,y=35.6725125899093,label=paste("合計",count,"人")),size=8)+
                 coord_sf(datum = NA) +
                 theme_void()+
                 ggtitle(paste(date1,x,sep = "~"))+
                 #theme(plot.background=element_rect(fill = "lightgray", colour = "white"))
                 theme(legend.background = element_rect(fill = "gray",size=10,colour="gray"),
-                      legend.title = element_blank())
-                         
-                          
+                      legend.title = element_blank(),
+                )
+            }else if(input$label=="RFCT"){
+              ggplot(data7.2)+
+                geom_sf(data=data7.2%>%filter(N03_004!="横浜市"),
+                        aes(fill=count,color=""))+
+                geom_sf(data = data7.2%>%filter(N03_004=="横浜市"),
+                        aes(color=""))+
+                scale_fill_gradient(low = "white",high = "red",
+                                    breaks=seq(0,y*50,ifelse(y==1,10,100)),
+                                    limits=c(0,y*50))+
+                scale_color_manual(values ="gainsboro",
+                                   guide=F)+
+                #geom_text(data=xy,aes(x=X,y=Y,label=N03_004))+
+                geom_text(data=xy3,aes(x=X,y=Y,
+                                       label=paste0(round(count,2),"人")))+
+                geom_text(data=data8,
+                          aes(x=139.650599530497,y=35.6725125899093,label=paste("合計",count,"人")),size=8)+
+                coord_sf(datum = NA) +
+                theme_void()+
+                ggtitle(paste(date1,x,sep = "~"))+
+                #theme(plot.background=element_rect(fill = "lightgray", colour = "white"))
+                theme(legend.background = element_rect(fill = "gray",size=10,colour="gray"),
+                      legend.title = element_blank(),
+                )
+            }else{
+              ggplot(data7.2)+
+                geom_sf(data=data7.2%>%filter(N03_004!="横浜市"),
+                        aes(fill=count,color=""))+
+                geom_sf(data = data7.2%>%filter(N03_004=="横浜市"),
+                        aes(color=""))+
+                scale_fill_gradient(low = "white",high = "red",
+                                    breaks=seq(0,y*50,ifelse(y==1,10,100)),
+                                    limits=c(0,y*50))+
+                scale_color_manual(values ="gainsboro",
+                                   guide=F)+
+                #geom_text(data=xy,aes(x=X,y=Y,label=N03_004))+
+                # geom_text(data=xy3,aes(x=X,y=Y,
+                #                        label=paste0(round(count,2),"人")))+
+                geom_text(data=data8,
+                          aes(x=139.650599530497,y=35.6725125899093,label=paste("合計",count,"人")),size=8)+
+                coord_sf(datum = NA) +
+                theme_void()+
+                ggtitle(paste(date1,x,sep = "~"))+
+                #theme(plot.background=element_rect(fill = "lightgray", colour = "white"))
+                theme(legend.background = element_rect(fill = "gray",size=10,colour="gray"),
+                      legend.title = element_blank(),
+                )
+            }
 
+
+                         
+                
 
         })
     
     output$covid_map <- renderPlot({
       action1()
+        
 
         })
    
     action2<-
         
-      eventReactive(!is.null(input$x),ignoreInit = T, {
+      eventReactive(!is.null(input$x)&!is.null(input$label),ignoreInit = T, {
              
              x<-lubridate::ymd(input$x)
 
@@ -226,17 +291,20 @@ shinyServer(function(input, output, session) {
         #     filter(rank==1)%>%
         #     ungroup()
 
-
+            #x<-"2021-05-27"
              data1<-data%>%
                mutate(flag=ifelse(x<=end,1,ifelse(end<x,2,0)))%>%
                filter(as.numeric(flag)>0)%>%
                arrange(flag)
               if(data1[1,10]==1){
-                data1<-data1%>%filter(x<=end,x>=start)
+                data1<-data1%>%filter(x<=end,start<=x)
               }
               if(data1[1,10]==2){
                 data1<-data1%>%mutate(max=max(end))%>%filter(end==max)
               }
+             data2<-
+               data1%>%
+               summarise(count=sum(count))
         yoko_shp<-
             sp::merge(shp2, data1,
                           #filter(year==input$year1,date%in%input$d2)
@@ -244,21 +312,60 @@ shinyServer(function(input, output, session) {
 
         xy4<-left_join(xy2,data1, by = "N03_004")
 
-        
-        ggplot(yoko_shp)+
+        if(input$label=="RTCT"){
+          ggplot(yoko_shp)+
           geom_sf(aes(fill=count,color=""))+
           scale_fill_gradient(low = "white",high = "red",
                               breaks=seq(0,350,100),
                               limits=c(0,350))+
           scale_color_manual(values ="gainsboro",
                              guide=F)+
-          geom_text(data=xy4,aes(x=X,y=Y,label=paste0(N03_004," ",count,"人")))+
+          geom_text(data=xy4,aes(x=X,y=Y,
+                                 label=paste0(N03_004," ",count,"人")))+
+          geom_text(data=data2,
+                    aes(x=139.662493759456,y=35.616158,label=paste("合計",count,"人")),size=8)+
           #geom_text(data=xy2,aes(x=X,y=Y,label=N03_004))+
           coord_sf(datum = NA) +
           theme_void()+
           ggtitle(paste0(unique(as.character(yoko_shp$start)),"~",unique(as.character(yoko_shp$end))))+
           theme(legend.background = element_rect(fill = "gray",size=10,colour="gray"),
                 legend.title = element_blank())
+        }else if(input$label=="RFCT"){
+          ggplot(yoko_shp)+
+            geom_sf(aes(fill=count,color=""))+
+            scale_fill_gradient(low = "white",high = "red",
+                                breaks=seq(0,350,100),
+                                limits=c(0,350))+
+            scale_color_manual(values ="gainsboro",
+                               guide=F)+
+            geom_text(data=xy4,aes(x=X,y=Y,
+                                   label=paste0(count,"人")))+
+            geom_text(data=data2,
+                      aes(x=139.662493759456,y=35.616158,label=paste("合計",count,"人")),size=8)+
+            #geom_text(data=xy2,aes(x=X,y=Y,label=N03_004))+
+            coord_sf(datum = NA) +
+            theme_void()+
+            ggtitle(paste0(unique(as.character(yoko_shp$start)),"~",unique(as.character(yoko_shp$end))))+
+            theme(legend.background = element_rect(fill = "gray",size=10,colour="gray"),
+                  legend.title = element_blank())
+        }else{
+          ggplot(yoko_shp)+
+            geom_sf(aes(fill=count,color=""))+
+            scale_fill_gradient(low = "white",high = "red",
+                                breaks=seq(0,350,100),
+                                limits=c(0,350))+
+            scale_color_manual(values ="gainsboro",
+                               guide=F)+
+            geom_text(data=data2,
+                      aes(x=139.662493759456,y=35.616158,label=paste("合計",count,"人")),size=8)+
+            #geom_text(data=xy2,aes(x=X,y=Y,label=N03_004))+
+            coord_sf(datum = NA) +
+            theme_void()+
+            ggtitle(paste0(unique(as.character(yoko_shp$start)),"~",unique(as.character(yoko_shp$end))))+
+            theme(legend.background = element_rect(fill = "gray",size=10,colour="gray"),
+                  legend.title = element_blank())
+        }
+        
           
         })
                 
@@ -268,7 +375,7 @@ shinyServer(function(input, output, session) {
     })
     action3<-
         
-      eventReactive(!is.null(input$x)|!is.null(input$y), {     
+      eventReactive(!is.null(input$x)|!is.null(input$y)&!is.null(input$label), {     
         x<-lubridate::ymd(input$x)
         y<-as.numeric(input$y)
 
@@ -292,14 +399,20 @@ shinyServer(function(input, output, session) {
             dplyr::filter(is.numeric(count_j))%>%
             filter(!is.na(count_j))%>%
             mutate(N03_004=Residential_City)
-
+        data8<-
+          data7.1%>%
+          summarise(count=sum(count))%>%
+          cbind(jinko%>%filter(City=="総数"))%>%
+          mutate(count_j=round(count/jinko*100000,2))
 
         data7.2<-
             sp::merge(shp, jinko3,
-                      by="N03_004", all=F,duplicateGeoms = TRUE)
+                      by="N03_004", all=F,duplicateGeoms = TRUE)%>%
+          mutate(count_j=ifelse(count_j>y*8,y*8,count_j))
 
         xy3<-left_join(xy,jinko3, by = "N03_004")
-        ggplot(data7.2)+ 
+        if(input$label=="RTCT"){
+          ggplot(data7.2)+ 
             geom_sf(data=data7.2%>%filter(N03_004!="横浜市"),
                     aes(fill=count_j,color=""))+
             geom_sf(data = data7.2%>%filter(N03_004=="横浜市"),
@@ -310,12 +423,57 @@ shinyServer(function(input, output, session) {
             scale_color_manual(values ="gainsboro",
                              guide=F)+
             #geom_text(data=xy,aes(x=X,y=Y,label=N03_004))+
-            geom_text(data=xy3,aes(x=X,y=Y,label=paste0(N03_004_2," ",round(count_j,2),"人")))+
+            geom_text(data=xy3,aes(x=X,y=Y,
+                                   label=paste0(N03_004_2," ",round(count_j,2),"人")))+
+            geom_text(data=data8,
+                      aes(x=139.64059,y=35.67251,label=paste("10万人当たりの感染者数",count_j,"人")),size=8)+
             coord_sf(datum = NA) +
             theme_void()+
             ggtitle(paste(date1,x,sep = "~"))+
             theme(legend.background = element_rect(fill = "gray",size=10,colour="gray"),
                   legend.title = element_blank())
+        }else if(input$label=="RFCT"){
+          ggplot(data7.2)+ 
+            geom_sf(data=data7.2%>%filter(N03_004!="横浜市"),
+                    aes(fill=count_j,color=""))+
+            geom_sf(data = data7.2%>%filter(N03_004=="横浜市"),
+                    aes(color=""))+
+            scale_fill_gradient(low = "white",high = "red",
+                                breaks=seq(0,y*8,ifelse(y==1,2,10)),
+                                limits=c(0,y*8))+
+            scale_color_manual(values ="gainsboro",
+                               guide=F)+
+            #geom_text(data=xy,aes(x=X,y=Y,label=N03_004))+
+            geom_text(data=xy3,aes(x=X,y=Y,
+                                   label=paste0(round(count_j,2),"人")))+
+            geom_text(data=data8,
+                      aes(x=139.64059,y=35.67251,label=paste("10万人当たりの感染者数",count_j,"人")),size=8)+
+            coord_sf(datum = NA) +
+            theme_void()+
+            ggtitle(paste(date1,x,sep = "~"))+
+            theme(legend.background = element_rect(fill = "gray",size=10,colour="gray"),
+                  legend.title = element_blank())
+        }else{
+          ggplot(data7.2)+ 
+            geom_sf(data=data7.2%>%filter(N03_004!="横浜市"),
+                    aes(fill=count_j,color=""))+
+            geom_sf(data = data7.2%>%filter(N03_004=="横浜市"),
+                    aes(color=""))+
+            scale_fill_gradient(low = "white",high = "red",
+                                breaks=seq(0,y*8,ifelse(y==1,2,10)),
+                                limits=c(0,y*8))+
+            scale_color_manual(values ="gainsboro",
+                               guide=F)+
+            #geom_text(data=xy,aes(x=X,y=Y,label=N03_004))+
+            geom_text(data=data8,
+                      aes(x=139.64059,y=35.67251,label=paste("10万人当たりの感染者数",count_j,"人")),size=8)+
+            coord_sf(datum = NA) +
+            theme_void()+
+            ggtitle(paste(date1,x,sep = "~"))+
+            theme(legend.background = element_rect(fill = "gray",size=10,colour="gray"),
+                  legend.title = element_blank())
+        }
+        
        
         })
     output$covid_map2 <- renderPlot({
@@ -324,7 +482,7 @@ shinyServer(function(input, output, session) {
     })
     action4<-
         
-      eventReactive(!is.null(input$x), {
+      eventReactive(!is.null(input$x)&!is.null(input$label), {
             x<-input$x
 
 
@@ -346,14 +504,22 @@ shinyServer(function(input, output, session) {
             sp::merge(shp2, data2,
                       by=c("N03_004","N03_003"), all=F,duplicateGeoms = TRUE)
         xy4<-left_join(xy2,data2, by = "N03_004")
-
-        ggplot(yoko_shp2)+
+        data3<-
+          data1%>%
+          summarise(count=sum(count))%>%
+          cbind(jinko%>%
+                  filter(City=="横浜市"))%>%
+          mutate(count_j=round(count/jinko*100000,2))
+        if(input$label=="RTCT"){
+          ggplot(yoko_shp2)+
             geom_sf(data=yoko_shp2%>%
                       filter(N03_003=="横浜市"),aes(fill=count_j,color=""))+
             scale_fill_gradient(low = "white",high = "red",
                                 breaks=seq(0,56,10),
                                 limits=c(0,56))+
-            geom_text(data=xy4,aes(x=X,y=Y,label=paste0(N03_004," ",round(count_j,2),"人")))+
+            geom_text(data=xy4,aes(x=X,y=Y,label=paste0(N03_004," ",count_j,"人")))+
+          geom_text(data=data3,
+                    aes(x=139.562493759456,y=35.616158,label=paste("10万人当たりの感染者数",count_j,"人")),size=8)+
             scale_color_manual(values ="gainsboro",
                              guide=F)+
             coord_sf(datum = NA) +
@@ -361,6 +527,41 @@ shinyServer(function(input, output, session) {
             ggtitle(paste0(unique(as.character(yoko_shp2$start)),"~",unique(as.character(yoko_shp2$end))))+
             theme(legend.background = element_rect(fill = "gray",size=10,colour="gray"),
                   legend.title = element_blank())
+        }else if(input$label=="RFCT"){
+          ggplot(yoko_shp2)+
+            geom_sf(data=yoko_shp2%>%
+                      filter(N03_003=="横浜市"),aes(fill=count_j,color=""))+
+            scale_fill_gradient(low = "white",high = "red",
+                                breaks=seq(0,56,10),
+                                limits=c(0,56))+
+            geom_text(data=xy4,aes(x=X,y=Y,label=paste0(count_j,"人")))+
+            geom_text(data=data3,
+                      aes(x=139.562493759456,y=35.616158,label=paste("10万人当たりの感染者数",count_j,"人")),size=8)+
+            scale_color_manual(values ="gainsboro",
+                               guide=F)+
+            coord_sf(datum = NA) +
+            theme_void()+
+            ggtitle(paste0(unique(as.character(yoko_shp2$start)),"~",unique(as.character(yoko_shp2$end))))+
+            theme(legend.background = element_rect(fill = "gray",size=10,colour="gray"),
+                  legend.title = element_blank())
+        }else{
+          ggplot(yoko_shp2)+
+            geom_sf(data=yoko_shp2%>%
+                      filter(N03_003=="横浜市"),aes(fill=count_j,color=""))+
+            scale_fill_gradient(low = "white",high = "red",
+                                breaks=seq(0,56,10),
+                                limits=c(0,56))+
+            geom_text(data=data3,
+                      aes(x=139.562493759456,y=35.616158,label=paste("10万人当たりの感染者数",count_j,"人")),size=8)+
+            scale_color_manual(values ="gainsboro",
+                               guide=F)+
+            coord_sf(datum = NA) +
+            theme_void()+
+            ggtitle(paste0(unique(as.character(yoko_shp2$start)),"~",unique(as.character(yoko_shp2$end))))+
+            theme(legend.background = element_rect(fill = "gray",size=10,colour="gray"),
+                  legend.title = element_blank())
+        }
+        
   
         })
     output$yoko_map2<-renderPlot({
