@@ -6,9 +6,17 @@ if (!require(leaflet)) {
     install.packages("leaflet")
 }
 library(leaflet)
-
+####
+if (!require(shinythemes)) {
+    install.packages("shinythemes")
+}
+library(shinythemes)
+####
 shinyUI(fluidPage(
-    tags$title("神奈川県の新型コロナ感染動向　市区町村別のコロプレスマップ"),
+    #デザインを変えることができるよ####
+    theme = shinytheme("lumen"),
+    ####
+    tags$title("神奈川県の市区町村ごとの新型コロナウイルス新規感染者数（コロプレスマップ）"),
     tags$head(
         tags$script("async src"="https://www.googletagmanager.com/gtag/js?id=G-XGR6Z90C8P"),
         tags$script("window.dataLayer = window.dataLayer || [];
@@ -48,7 +56,7 @@ shinyUI(fluidPage(
     tags$div(class="th",
              tags$div(class="title",
                       h2(img(src="tokai.JPG",width="50px"),
-                         "神奈川県の新型コロナ感染動向　市区町村別のコロプレスマップ")),
+                         "神奈川県の市区町村ごとの新型コロナウイルス新規感染者数（コロプレスマップ）")),
              tags$div(class="home",tags$a(href="http://covid-map.bmi-tokai.jp/","ホームへ戻る"),"　　")),
     
     conditionalPanel(condition="$('html').hasClass('shiny-busy')",
@@ -58,29 +66,33 @@ shinyUI(fluidPage(
     #列で管理####
     fluidRow(
         wellPanel(
+            #削除####
             #column(1,h4("設定")),
-            column(1,h4("日付の設定")),
+            ####
+            column(1,h4("日付")),
             column(1,uiOutput("date")),
             column(3,
                    # h4("単位ごとの変動"),
-                   actionButton("back",label="前の週"),
-                   actionButton("yesterday",label="前の日"),
-                   actionButton("tomorrow", label = "次の日"),
-                   actionButton("next1", label = "次の週")),
-            h4(column(1,"期間の設定"),
+                   actionButton("back",label="前週"),
+                   actionButton("yesterday",label="前日"),
+                   actionButton("tomorrow", label = "翌日"),
+                   actionButton("next1", label = "翌週")),
+            h4(column(1,"期間"),
                column(2,
                       radioButtons("y",
                                    # label =  h4("累積日数を設定してください"),
                                    label =NULL,
                                    choices = c("1日"="1", "7日間累積"="7"),
                                    inline = T))),
-            h4(
-            column(1,"ラベル"),
-            column(3,
-                   radioButtons("label",label=NULL,
-                                c("市区町村と件数"="RTCT","件数"="RFCT","非表示"="RFCF"),
-                                inline = T
-                                ))),
+            #追加####
+            # h4(
+            # column(1,""),
+            # column(3,
+            #        radioButtons("label",label=NULL,
+            #                     c("市区町村と件数"="RTCT","件数"="RFCT","非表示"="RFCF"),
+            #                     inline = T
+            #                     ))),
+            ####
             "　")),
     
     # Show a plot of the generated distribution
@@ -130,7 +142,9 @@ shinyUI(fluidPage(
                      p("11月末までのデータはジャックジャパンのデータを使用しています。", br(),
                      tags$a(href="https://gis.jag-japan.com/covid19jp/","新型コロナウイルス感染者数マップ")), 
                      
-                     p("本サイトでは、横浜市、横須賀市、相模原市、藤沢市は発表日を他の市町村は陽性判明日を元に感染者の集計を行っています。", br(),
+                     p("本サイトでは、横浜市、横須賀市、相模原市、藤沢市は発表日を他の市町村は陽性判明日を元に感染者の集計を行っています。",
+                       br(),
+                       p("データは13時～14時で更新を行っています。"),
                      "各サイトのデータをまとめたデータは",tags$a(href="https://raw.githubusercontent.com/tanamym/covid19_colopressmap_isehara/main/coviddata.csv","こちら")),
                   
                      p("横浜市の区別データは以下のサイトのデータを参照しています。", br(),
