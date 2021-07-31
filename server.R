@@ -46,7 +46,9 @@ shinyServer(function(input, output, session) {
       fread("https://raw.githubusercontent.com/tanamym/covid19_colopressmap_isehara/main/coviddata.csv",encoding="UTF-8")%>%
       #read.csv("https://raw.githubusercontent.com/tanamym/covid19_colopressmap_isehara/main/coviddata.csv",encoding="UTF-8")%>%  
       mutate(Fixed_Date=as.Date(Fixed_Date),
-             Residential_City=str_replace(Residential_City,".+外.+","その他"))
+             Residential_City=str_replace(Residential_City,".+外.*","その他"))%>%
+      mutate(Residential_City=ifelse(Hos!="川崎市",str_replace(Residential_City,"川崎市|東京都","その他"),Residential_City))#%>%
+    #filter(Residential_City=="その他",Hos=="相模原")
     date<-
         data7%>%
         data.frame()%>%
