@@ -45,8 +45,8 @@ shinyServer(function(input, output, session) {
     data7<-
       fread("https://raw.githubusercontent.com/tanamym/covid19_colopressmap_isehara/main/coviddata.csv",encoding="UTF-8")%>%
       #read.csv("https://raw.githubusercontent.com/tanamym/covid19_colopressmap_isehara/main/coviddata.csv",encoding="UTF-8")%>%  
-      mutate(Fixed_Date=as.Date(Fixed_Date))%>%
-        filter(!is.na(X))
+      mutate(Fixed_Date=as.Date(Fixed_Date),
+             Residential_City=str_replace(Residential_City,".+外.+","その他"))
     date<-
         data7%>%
         data.frame()%>%
@@ -96,7 +96,8 @@ shinyServer(function(input, output, session) {
     data<-
         left_join(yoko3,yoko4)%>%
         left_join(yoko2)%>%
-        filter(!name%in%c("日本","横浜市","市外","調査中","神奈川県"))%>%
+        filter(!name%in%c("日本","横浜市","調査中","神奈川県"))%>%
+      mutate(name=str_replace(name,"市外","その他"))%>%
         rename("N03_004"="name")%>%
         mutate(count=as.numeric(as.character(count)))%>%#文字列にしてから数字に直す
         #filter(date=="4/16~4/22")%>%
@@ -176,20 +177,20 @@ shinyServer(function(input, output, session) {
 
             date1<-
                 x-y+1
-
+            City[nrow(City)+1,]<-"その他"
             data7.1<-
                 data7%>%
                 dplyr::filter(Fixed_Date>=date1,
                               Fixed_Date<=x)%>%
                 # dplyr::filter(Fixed_Date>="2021-04-24",
                 #               Fixed_Date<="2021-04-24")%>%
-                dplyr::group_by(Residential_City,X,Y)%>%
+                dplyr::group_by(Residential_City)%>%
                 summarise(count=n())%>%
                 full_join(City)%>%
                 mutate(count=ifelse(is.na(count),0,count))%>%
                 mutate(N03_004=Residential_City)%>%
                 ungroup()%>%
-                select(-X,-Y)%>%
+                #select(-X,-Y)%>%
                 #dplyr::filter(X>0,Y>0)%>%
                 dplyr::filter(is.numeric(count))%>%
                 ungroup()
@@ -200,13 +201,14 @@ shinyServer(function(input, output, session) {
             data7.2<-
                 sp::merge(shp,
                           data7.1,
-                          by="N03_004", all=F,duplicateGeoms = TRUE)
+                          by="N03_004", all=F,duplicateGeoms = TRUE)%>%
+              mutate(count2=ifelse(count>y*50,y*50,count))
             xy3<-left_join(xy,data7.1, by = "N03_004")
 
               print(input$label)
               ggplot(data7.2)+
                 geom_sf(data=data7.2%>%filter(N03_004!="横浜市"),
-                        aes(fill=count,color=""))+
+                        aes(fill=count2,color=""))+
                 geom_sf(data = data7.2%>%filter(N03_004=="横浜市"),
                         aes(color=""))+
                 scale_fill_gradient(low = "white",high = "red",
@@ -217,6 +219,8 @@ shinyServer(function(input, output, session) {
                 #geom_text(data=xy,aes(x=X,y=Y,label=N03_004))+
                 geom_text(data=xy3,aes(x=X,y=Y,
                                        label=paste0(N03_004_2," ",round(count,1),"人")))+
+                geom_text(data=data7.1%>%filter(N03_004=="その他"),aes(x=139.400,y=35.172,
+                                       label=paste0(N03_004," ",round(count,1),"人")))+
                 geom_text(data=data8,
                           aes(x=139.650599530497,y=35.6725125899093,label=paste("合計",count,"人")),size=8)+
                 coord_sf(datum = NA) +
@@ -283,6 +287,8 @@ shinyServer(function(input, output, session) {
                              guide=F)+
           geom_text(data=xy4,aes(x=X,y=Y,
                                  label=paste0(N03_004," ",count,"人")))+
+            geom_text(data=data1%>%filter(N03_004=="その他"),aes(x=139.51,y=35.31,
+                                   label=paste0(N03_004," ",count,"人")))+
           geom_text(data=data2,
                     aes(x=139.662493759456,y=35.616158,label=paste("合計",count,"人")),size=8)+
           #geom_text(data=xy2,aes(x=X,y=Y,label=N03_004))+
